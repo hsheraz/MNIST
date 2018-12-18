@@ -1,0 +1,162 @@
+ getwd()
+ setwd("/Users/User/Desktop/STATS 4M03")
+ getwd()
+ heartdata<-read.csv(file="heart dataset.csv",header=FALSE,sep=",")
+ head(heartdata)
+ names(heartdata)<-c("Age","sex","cp","trestbps","chol","fbs","restecg","thalach","exang","oldpeak","slope","ca","thal","outcome")
+ View(heartdata)
+str(heartdata)
+
+## coding 1=0 and 2=1 for heart status to maintain consistency##
+ heartdata$outcome = heartdata$outcome - 1
+ heartdata$outcome = factor(heartdata$outcome,labels=c("Absence","Presence"))
+ heartdata$sex = factor(heartdata$sex,labels=c("Female","Male"))
+ heartdata$cp = factor(heartdata$cp,labels=c("typical","atypical","non-ang","asymp"))
+ heartdata$restecg = factor(heartdata$restecg,labels=c("normal","abnormality","ventricular hypertrophy"))
+ heartdata$fbs = factor(heartdata$fbs,labels=c(">120","<120"))
+ heartdata$exang = factor(heartdata$exang,labels=c("no","yes"))
+ heartdata$slope = factor(heartdata$slope,labels=c("unsloping","flat","downsloping"))
+ heartdata$thal = factor(heartdata$thal,labels=c("normal","fixed","reversible"))
+ heartdata$outcome = factor(heartdata$outcome,labels=c("Absence","Presence"))
+
+##categorical variables##
+
+#ordinal variable#
+
+table_slope<-table(heartdata$outcome,heartdata$slope)
+table_slope
+32/270
+78/270
+10/270
+row.names(table_slope)<-c("Absence","Presence")
+colnames(table_slope)<-c("unsloping","flat","downsloping")
+colours<-c("yellow","green")
+barplot(table_slope,main="Slope and presence of heart disease",xlab="Slope",ylab="Amount of Patients",col=colours)
+legend("topright",c("Absence","Presence"),bty="n",fill=colours)
+
+##Chi squared testing for binary and nominal##
+
+chisq.test(heartdata$sex,heartdata$outcome)
+chisq.test(heartdata$fbs,heartdata$outcome)
+chisq.test(heartdata$exang,heartdata$outcome)
+chisq.test(heartdata$cp,heartdata$outcome)
+chisq.test(heartdata$restecg,heartdata$outcome)
+chisq.test(heartdata$chol,heartdata$outcome)
+chisq.test(heartdata$thal,heartdata$outcome)
+chisq.test(heartdata$thalach,heartdata$outcome)
+
+##continuous variables##
+library(GGally)
+library(ggplot2)
+cont<-heartdata[,c(1,2,4,5,8,10,12,14)]
+ggpairs(cont,aes(col=sex))
+table(heartdata$sex)
+183/270
+1-0.6778
+
+##classification analysis##
+install.packages('rattle')
+ install.packages('rpart.plot')
+ install.packages('RColorBrewer')
+ library(rattle)
+ library(rpart.plot)
+ library(RColorBrewer)
+#train/test split#
+#set data into test and train#
+
+
+
+#tree#
+library(rpart)
+library(rattle)
+heart_tree<-rpart(outcome~.,data=heartdata,method="class")
+summary(heart_tree)
+fancyRpartPlot(heart_tree)
+
+#classification analysis#
+
+ heartdata_tree<-rpart(outcome~.,data=heartdata,method="class")
+ summary(heartdata_tree)
+ printcp(heartdata_tree)
+ fancyRpartPlot(heartdata_tree)
+ heartdata_train<-sample(1:nrow(heartdata),size=0.7*nrow(heartdata))
+ heartdata_tree2<-rpart(outcome~.,data=heartdata,subset=heartdata_train,method="class")
+ printcp(heartdata_tree2)
+ fancyRpartPlot(heartdata_tree2)
+ pred<-table(predict(heartdata_tree2,heartdata[-heartdata_train,],type="class"),heartdata[-heartdata_train,"outcome"])
+library(e1071)
+classAgreement(pred)
+1-classAgreement(pred)$diag #misclassification#
+
+#clustering#
+library(e1071)
+library(cluster)
+library(factoextra)
+##get rid of categorical variables##
+
+ heart=heartdata
+heart$outcome<-NULL
+ heart$sex<-NULL
+ heart$cp<-NULL
+ heart$restecg<-NULL
+ heart$fbs<-NULL
+ heart$exang<-NULL
+ heart$slope<-NULL
+ heart$thal<-NULL
+ heart
+#convert factor to scale##
+ scale<-scale(heart)
+
+##elbow plot##
+wss<-0
+for (i in 1:15) {
+km.out<-kmeans(scale,centers=i,nstart=20)
+ wss[i]<-km.out$tot.withinss}
+plot(1:15,wss,type="b",xlab="Number of Clusters",ylab="Within groups sum of squares")
+abline(v=4, lty=2)
+
+##k=4##
+heart_kmeans<-kmeans(scale,4)
+heart_kmeans
+kmeans_table<-table(heartdata[,14],heart_kmeans$cluster)
+kmeans_table
+plot(scale,col=heart_kmeans$cluster,pch=19,framwse=FALSE)
+classAgreement(kmeans_table)
+#misclassification#
+1-classAgreement(kmeans_table)$diag
+
+##k=3##
+heart_kmeans3<-kmeans(scale,3)
+heart_kmeans3
+kmeans_table3<-table(heartdata[,14],heart_kmeans3$cluster)
+kmeans_table3
+
+##k=2##
+
+heart_kmeans2<-kmeans(scale,2)
+heart_kmeans2
+kmeans_table2<-table(heartdata[,14],heart_kmeans2$cluster)
+kmeans_table2
+plot(scale,col=heart_kmeans2$cluster,pch=19,framwse=FALSE)
+classAgreement(kmeans_table2)
+fviz_nbclust(scale,kmeans,method="wss")+geom_vline(xintercept=2,linetype=2)
+
+##medoids##
+
+ heart_medoids<-pam(scale,2)
+ heart_medoids
+ heart_medoids$clustering
+ medoids_table<-table(heartdata[,14],heart_medoids$clustering)
+ classAgreement(medoids_table)
+ 1-classAgreement(medoids_table)$diag
+
+##silhouette medoids##
+
+ si<-silhouette(heart_medoids$clustering,dist(scale))
+ summary(si)
+ plot(si,nmax=80,cex.names=0.6,border=NA,main="Silhouette for k-medoids")
+
+ ##silhouette for k-means##
+ si_means<-silhouette(heart_kmeans2$cluster,dist(scale))
+ summary(si_means)
+ plot(si_means,nman=80,cex.names=0.6,border=NA, main="Silhouette for k-means")
